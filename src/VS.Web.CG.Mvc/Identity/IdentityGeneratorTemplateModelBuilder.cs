@@ -182,8 +182,8 @@ namespace Microsoft.VisualStudio.Web.CodeGenerators.Mvc.Identity
                 ValidateFilesOption();
             }
 
-            bool generateLayout = DetermineSupportFileLocation(out string supportFileLocation, out string layout);
-
+            bool hasExistingLayout = DetermineSupportFileLocation(out string supportFileLocation, out string layout);
+            
             var templateModel = new IdentityGeneratorTemplateModel()
             {
                 ApplicationName = _applicationInfo.ApplicationName,
@@ -197,8 +197,9 @@ namespace Microsoft.VisualStudio.Web.CodeGenerators.Mvc.Identity
                 IsGenerateCustomUser = IsGenerateCustomUser,
                 IsGeneratingIndividualFiles = IsFilesSpecified,
                 UseDefaultUI = _commandlineModel.UseDefaultUI,
-                GenerateLayout = generateLayout,
+                GenerateLayout = !hasExistingLayout,
                 Layout = layout,
+                LayoutPageNoExtension = Path.GetFileNameWithoutExtension(layout),
                 SupportFileLocation = supportFileLocation
             };
 
@@ -208,6 +209,11 @@ namespace Microsoft.VisualStudio.Web.CodeGenerators.Mvc.Identity
             if (!_commandlineModel.UseDefaultUI)
             {
                 filesToGenerate.AddRange(IdentityGeneratorFilesConfig.GetViewImports(filesToGenerate, _fileSystem, _applicationInfo.ApplicationBasePath));
+            }
+
+            if (IdentityGeneratorFilesConfig.TryGetLayoutPeerFiles(_fileSystem, _applicationInfo.ApplicationBasePath, templateModel, out IReadOnlyList<IdentityGeneratorFile> layoutPeerFiles))
+            {
+                filesToGenerate.AddRange(layoutPeerFiles);
             }
 
             templateModel.FilesToGenerate = filesToGenerate.ToArray();
@@ -236,6 +242,8 @@ namespace Microsoft.VisualStudio.Web.CodeGenerators.Mvc.Identity
 
         // Checks if there is an existing layout page, and based on its location or lack of existence, determines where to put support pages.
         // Returns true if there is an existing layout page.
+        // Note: layoutFile & supportFileLocation will always have a value when this exits.
+        //      supportFileLocation is rooted
         private bool DetermineSupportFileLocation(out string supportFileLocation, out string layoutFile)
         {
             string projectDir = Path.GetDirectoryName(_projectContext.ProjectFullPath);
